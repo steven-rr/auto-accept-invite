@@ -1,0 +1,9 @@
+package-as: AutoAcceptInvite
+
+ignore:
+  - README.md
+  - LICENSE
+  - .gitignore
+  - .pkgmeta
+  - .github
+  - .DS_Store
