@@ -348,7 +348,7 @@ end
 -- below.
 local function AddChoices(anchor, heading, choices, getChoice, setChoice, x)
 	local text = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x or INDENT, -4)
+	text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x or INDENT, -8)
 	text:SetText(heading)
 
 	local last = text
