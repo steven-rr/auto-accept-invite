@@ -110,14 +110,25 @@ function AcceptGroup() called("AcceptGroup") end
 function StaticPopup_Hide(which) called("StaticPopup_Hide", which) end
 
 -- Queues the player can be waiting in. A check fills these.
-NUM_LE_LFG_CATEGORYS = 6
-game.finder_modes = {}            -- per finder category: "queued", "proposal", ...
-game.battlefields = {}            -- per battlefield slot: "queued", "confirm", "active", ...
+game.finder_modes = {}            -- per finder category: "queued", "proposal", "lfgparty", ...
+game.battlefields = {}            -- per battlefield slot: "queued", "active", ...
 game.sign_ups_waiting = 0         -- sign-ups to premade groups still unanswered
-function GetLFGMode(category) return game.finder_modes[category] end
-function GetMaxBattlefieldID() return 3 end
-function GetBattlefieldStatus(index) return game.battlefields[index] or "none" end
-C_LFGList = { GetNumApplications = function() return game.sign_ups_waiting, game.sign_ups_waiting end }
+
+-- The game's own answer to "would accepting an invite take me out of a queue",
+-- which every game version has. Any finder state counts except being in a
+-- group the finder made; so do waiting sign-ups and battleground queues.
+function WillAcceptInviteRemoveQueues()
+    called("WillAcceptInviteRemoveQueues")
+    for category = 1, 8 do
+        local mode = game.finder_modes[category]
+        if mode and mode ~= "lfgparty" then return true end
+    end
+    if game.sign_ups_waiting > 0 then return true end
+    for index = 1, 3 do
+        if game.battlefields[index] == "queued" then return true end
+    end
+    return false
+end
 
 -- Friends and guild, asked about by GUID. A check fills these tables.
 game.friends, game.battle_net_friends, game.guild = {}, {}, {}
@@ -473,6 +484,16 @@ def accepts_while_queued_when_the_player_asks_for_that():
         queue_up(game, where)
         invite(game, "Bob")
         assert game.count("AcceptGroup") == 1, where
+        assert game.count("WillAcceptInviteRemoveQueues") == 0, "no need to ask the game then"
+
+
+@check
+def accepts_when_the_game_cannot_say_whether_a_queue_would_end():
+    lua, game = load("retail")
+    lua.globals().WillAcceptInviteRemoveQueues = None  # a game version without that function
+    queue_up(game, "dungeon finder")
+    invite(game, "Bob")
+    assert game.count("AcceptGroup") == 1
 
 
 @check

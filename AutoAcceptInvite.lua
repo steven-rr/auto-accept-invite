@@ -136,35 +136,12 @@ end
 -- Joining a group takes the player out of a queue they may have waited in for
 -- a long time, so an invite that arrives then is left for them to answer.
 
--- Whether the player is waiting in a queue: the dungeon or raid finder, a
--- battleground or arena, or sign-ups to premade groups.
-local function IsInQueue()
-	if GetLFGMode and NUM_LE_LFG_CATEGORYS then
-		for category = 1, NUM_LE_LFG_CATEGORYS do
-			local mode = GetLFGMode(category)
-			if mode == "queued" or mode == "rolecheck" or mode == "proposal" or mode == "suspended" then
-				return true
-			end
-		end
-	end
-
-	if GetBattlefieldStatus and GetMaxBattlefieldID then
-		for index = 1, GetMaxBattlefieldID() do
-			local status = GetBattlefieldStatus(index)
-			if status == "queued" or status == "confirm" then
-				return true
-			end
-		end
-	end
-
-	if C_LFGList and C_LFGList.GetNumApplications then
-		local _, waiting = C_LFGList.GetNumApplications()
-		if waiting and waiting > 0 then
-			return true
-		end
-	end
-
-	return false
+-- Whether accepting an invite now would take the player out of a queue: the
+-- dungeon or raid finder, a battleground, or sign-ups to premade groups. The
+-- game has its own check for this, which its invite popup uses to add a
+-- warning; asking the same one means the two always agree.
+local function WouldLeaveQueue()
+	return WillAcceptInviteRemoveQueues ~= nil and WillAcceptInviteRemoveQueues() and true or false
 end
 
 ------------------------------------------------------------------------
@@ -503,7 +480,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			who = " from " .. inviter
 		end
 
-		if not AcceptsWhileQueued() and IsInQueue() then
+		if not AcceptsWhileQueued() and WouldLeaveQueue() then
 			Announce("queued", "left the invite" .. who .. " for you: accepting it takes you out of your queue.",
 				"/aai options to change this.")
 			return

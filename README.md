@@ -13,7 +13,7 @@ A tiny World of Warcraft addon that automatically accepts every incoming party o
 
 Out of the box it accepts invites from **everyone**, including players you don't know. You can narrow that down, below.
 
-The one exception is an invite that arrives while you are in a queue: the dungeon or raid finder, a battleground or arena, or sign-ups to premade groups. Accepting would take you out of the queue, so the addon leaves that invite for you and says so in chat. Untick **Not while I'm in a queue** to have it accept those too.
+The one exception is an invite that arrives while you are in a queue it would take you out of: the dungeon or raid finder, a battleground, or sign-ups to premade groups. These are the same cases in which the game's own invite popup warns you. The addon leaves that invite for you and says so in chat. Untick **Not while I'm in a queue** to have it accept those too.
 
 ### Whose invites
 
