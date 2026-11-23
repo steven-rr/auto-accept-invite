@@ -768,12 +768,34 @@ def signing_up_is_quiet_when_chat_messages_are_off():
     assert printed(game) == []
 
 
+def panel_texts(game):
+    """Every piece of text the options panel shows."""
+    texts = []
+    for i in range(1, len(game.frames) + 1):
+        text = game.frames[i].text
+        if isinstance(text, str):
+            texts.append(text)
+    return texts
+
+
 @check
 def a_game_version_with_role_checks_but_no_sign_up_window_still_gets_the_option():
     lua, game = load("mists", {})
     assert game.checkbox("Automatically queue for me") is not None
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 1
+
+
+@check
+def the_options_describe_only_the_role_windows_the_game_version_has():
+    lua, game = load("retail")
+    note = [t for t in panel_texts(game) if t.startswith("Answers the role window")][0]
+    assert "group's leader queues" in note and "sign up for a group yourself" in note and "Hold Shift" in note
+
+    lua, game = load("mists")  # a role check, but no sign-up window
+    note = [t for t in panel_texts(game) if t.startswith("Answers the role window")][0]
+    assert "group's leader queues" in note
+    assert "sign up" not in note and "Shift" not in note
 
 
 @check

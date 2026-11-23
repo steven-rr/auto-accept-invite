@@ -396,11 +396,22 @@ local function AddCheckboxes()
 			GetDB().noAutoQueue = not checked
 		end, -INDENT)
 
+		-- Describe only the role windows this game version has: one with a role
+		-- check does not always have the sign-up window too.
+		local shiftTip = "\nHold Shift as you sign up to choose the role or write a note yourself."
+		local explanation
+		if LFDRoleCheckPopup and LFGListApplicationDialog then
+			explanation = "Answers the role window when your group's leader queues, and when you sign up for a group yourself." .. shiftTip
+		elseif LFGListApplicationDialog then
+			explanation = "Answers the role window when you sign up for a group yourself." .. shiftTip
+		else
+			explanation = "Answers the role window when your group's leader queues."
+		end
+
 		local note = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		note:SetPoint("TOPLEFT", last, "BOTTOMLEFT", INDENT, 0)
 		note:SetJustifyH("LEFT")
-		note:SetText("Answers the role window when your group's leader queues, and when you sign up for a group yourself.\n"
-			.. "Hold Shift as you sign up to choose the role or write a note yourself.")
+		note:SetText(explanation)
 
 		last = AddChoices(note, "Queue as:", {
 			{ nil, "My current specialization's role" },
