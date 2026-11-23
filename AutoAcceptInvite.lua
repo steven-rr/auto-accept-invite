@@ -16,21 +16,31 @@ local PREFIX = "|cff33ff99AutoAcceptInvite|r: "
 ------------------------------------------------------------------------
 -- Settings
 ------------------------------------------------------------------------
--- Saved account-wide. Everything is "on" while unset, so a fresh install needs
--- no setup.
+-- Everything is "on" while unset, so a fresh install needs no setup.
+--
+-- Shared by every character on the account:
 --   AutoAcceptInviteDB.disabled     true = do not auto-accept invites
 --   AutoAcceptInviteDB.from         whose invites to accept: "FRIENDS_GUILD",
 --                                   "FRIENDS" or "GUILD"; unset = everyone's
+--   AutoAcceptInviteDB.evenInQueue  true = accept invites while in a queue too;
+--                                   unset = leave those for the player
 --   AutoAcceptInviteDB.noAutoQueue  true = do not queue for me: leave the
 --                                   game's role windows for the player
---   AutoAcceptInviteDB.role         the role to queue as: "TANK", "HEALER" or
+--   AutoAcceptInviteDB.quiet        true = no chat line when it does something
+--
+-- Kept per character, because a tank and a mage do not queue as the same role:
+--   AutoAcceptInviteCharDB.role     the role to queue as: "TANK", "HEALER" or
 --                                   "DAMAGER"; unset = the current
 --                                   specialization's role
---   AutoAcceptInviteDB.quiet        true = no chat line when it does something
 
 local function GetDB()
 	AutoAcceptInviteDB = AutoAcceptInviteDB or {}
 	return AutoAcceptInviteDB
+end
+
+local function GetCharDB()
+	AutoAcceptInviteCharDB = AutoAcceptInviteCharDB or {}
+	return AutoAcceptInviteCharDB
 end
 
 local function IsEnabled()
@@ -63,13 +73,18 @@ local function AcceptsFrom()
 	end
 end
 
+local function AcceptsWhileQueued()
+	return GetDB().evenInQueue == true
+end
+
 local function QueuesForMe()
 	return not GetDB().noAutoQueue
 end
 
--- The role picked in the options, or nil for "my current specialization's role".
+-- The role picked in the options for this character, or nil for "my current
+-- specialization's role".
 local function ChosenRole()
-	local role = GetDB().role
+	local role = GetCharDB().role
 	if role == "TANK" or role == "HEALER" or role == "DAMAGER" then
 		return role
 	end
@@ -113,6 +128,43 @@ local function IsWelcome(guid)
 		return false
 	end
 	return (from ~= "GUILD" and IsFriend(guid)) or (from ~= "FRIENDS" and IsGuildMate(guid)) or false
+end
+
+------------------------------------------------------------------------
+-- Invites while in a queue
+------------------------------------------------------------------------
+-- Joining a group takes the player out of a queue they may have waited in for
+-- a long time, so an invite that arrives then is left for them to answer.
+
+-- Whether the player is waiting in a queue: the dungeon or raid finder, a
+-- battleground or arena, or sign-ups to premade groups.
+local function IsInQueue()
+	if GetLFGMode and NUM_LE_LFG_CATEGORYS then
+		for category = 1, NUM_LE_LFG_CATEGORYS do
+			local mode = GetLFGMode(category)
+			if mode == "queued" or mode == "rolecheck" or mode == "proposal" or mode == "suspended" then
+				return true
+			end
+		end
+	end
+
+	if GetBattlefieldStatus and GetMaxBattlefieldID then
+		for index = 1, GetMaxBattlefieldID() do
+			local status = GetBattlefieldStatus(index)
+			if status == "queued" or status == "confirm" then
+				return true
+			end
+		end
+	end
+
+	if C_LFGList and C_LFGList.GetNumApplications then
+		local _, waiting = C_LFGList.GetNumApplications()
+		if waiting and waiting > 0 then
+			return true
+		end
+	end
+
+	return false
 end
 
 ------------------------------------------------------------------------
@@ -341,6 +393,12 @@ local function AddCheckboxes()
 		GetDB().disabled = not checked
 	end)
 
+	last = AddCheckbox(last, "Not while I'm in a queue (accepting takes me out of it)", function()
+		return not AcceptsWhileQueued()
+	end, function(checked)
+		GetDB().evenInQueue = not checked
+	end, INDENT, 0, 22)
+
 	last = AddChoices(last, "From:", {
 		{ nil, "Everyone" },
 		{ "FRIENDS_GUILD", "Friends and guild members" },
@@ -348,7 +406,7 @@ local function AddCheckboxes()
 		{ "GUILD", "Guild members only" },
 	}, AcceptsFrom, function(from)
 		GetDB().from = from
-	end)
+	end, 0)
 
 	if hasRoleWindows then
 		last = AddCheckbox(last, "Automatically queue for me", QueuesForMe, function(checked)
@@ -361,13 +419,13 @@ local function AddCheckboxes()
 		note:SetText("Answers the role window when your group's leader queues, and when you sign up for a group yourself.\n"
 			.. "Hold Shift as you sign up to choose the role or write a note yourself.")
 
-		last = AddChoices(note, "Queue as:", {
+		last = AddChoices(note, "Queue as (this character):", {
 			{ nil, "My current specialization's role" },
 			{ "TANK", RoleName("TANK") },
 			{ "HEALER", RoleName("HEALER") },
 			{ "DAMAGER", RoleName("DAMAGER") },
 		}, ChosenRole, function(role)
-			GetDB().role = role
+			GetCharDB().role = role
 		end, 0)
 	end
 
@@ -438,6 +496,19 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- An invite from someone the options leave out gets the normal popup.
 		if not IsWelcome(inviterGUID) then return end
 
+		-- On retail the inviter's name can be a "secret" value that addons may
+		-- not read; only print it when it is a normal string.
+		local who = ""
+		if type(inviter) == "string" and not (issecretvalue and issecretvalue(inviter)) then
+			who = " from " .. inviter
+		end
+
+		if not AcceptsWhileQueued() and IsInQueue() then
+			Announce("queued", "left the invite" .. who .. " for you: accepting it takes you out of your queue.",
+				"/aai options to change this.")
+			return
+		end
+
 		AcceptGroup()
 
 		-- Don't hide the invite popup yet: the default UI may not have shown it
@@ -445,12 +516,6 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- decline. Wait until we have joined.
 		self:RegisterEvent("GROUP_ROSTER_UPDATE")
 
-		-- On retail the inviter's name can be a "secret" value that addons may
-		-- not read; only print it when it is a normal string.
-		local who = ""
-		if type(inviter) == "string" and not (issecretvalue and issecretvalue(inviter)) then
-			who = " from " .. inviter
-		end
 		Announce("invite", "accepted invite" .. who .. ".", "/aai options to change this.")
 	elseif event == "GROUP_ROSTER_UPDATE" then
 		-- The roster also changes for other reasons, such as leaving the group

@@ -11,7 +11,9 @@ A tiny World of Warcraft addon that automatically accepts every incoming party o
 - Prints a line in chat saying what it did. The first line also says how to change it. The lines can be turned off.
 - Each part can be switched off at any time, to get the game's normal windows back.
 
-Out of the box it accepts **every** invite. That includes invites from players you don't know, and invites that arrive while you are queued for a dungeon, which takes you out of the queue. Switch it off when you don't want that.
+Out of the box it accepts invites from **everyone**, including players you don't know. You can narrow that down, below.
+
+The one exception is an invite that arrives while you are in a queue: the dungeon or raid finder, a battleground or arena, or sign-ups to premade groups. Accepting would take you out of the queue, so the addon leaves that invite for you and says so in chat. Untick **Not while I'm in a queue** to have it accept those too.
 
 ### Whose invites
 
@@ -31,7 +33,7 @@ The game asks for your role in two windows. With **Automatically queue for me** 
 - **The role check**, when your group's leader queues for a dungeon or battleground, or signs the group up for a premade group.
 - **The sign-up window**, when you sign up for a premade group yourself. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
 
-You choose which role it queues you as, under **Queue as** in the options:
+You choose which role it queues you as, under **Queue as** in the options. This one choice is kept per character, so your tank can always queue as tank while your other characters follow their specialization:
 
 - **My current specialization's role** (the default). On a healing specialization you queue as healer, whatever you ticked the last time.
 - **Tank**, **Healer** or **Damage**. Always that role, whatever specialization you are on.
@@ -45,12 +47,13 @@ It does not change anything when you queue from the Dungeon Finder yourself: the
 Open **Esc > Options > AddOns > AutoAcceptInvite**, or type `/aai options`.
 
 - **Auto-accept invites**: on by default.
+- **Not while I'm in a queue**: on by default.
 - **From**: everyone (the default), friends and guild members, friends only, or guild members only.
 - **Automatically queue for me**: on by default. Only shown in game versions that have a dungeon finder.
-- **Queue as**: my current specialization's role (the default), Tank, Healer or Damage.
+- **Queue as (this character)**: my current specialization's role (the default), Tank, Healer or Damage.
 - **Print a chat message when something is accepted**: on by default.
 
-Changes apply as soon as you click, and the settings are shared by every character on the account.
+Changes apply as soon as you click. The settings are shared by every character on the account, except **Queue as**, which each character keeps for itself.
 
 ## Commands
 

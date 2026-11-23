@@ -4,6 +4,7 @@
 ## Author: stevenrivadeneira
 ## Version: 1.0.0
 ## SavedVariables: AutoAcceptInviteDB
+## SavedVariablesPerCharacter: AutoAcceptInviteCharDB
 ## X-Category: Miscellaneous
 ## X-License: MIT
 ## X-Curse-Project-ID: 1825418

@@ -109,6 +109,16 @@ function IsInGroup() return game.in_group end
 function AcceptGroup() called("AcceptGroup") end
 function StaticPopup_Hide(which) called("StaticPopup_Hide", which) end
 
+-- Queues the player can be waiting in. A check fills these.
+NUM_LE_LFG_CATEGORYS = 6
+game.finder_modes = {}            -- per finder category: "queued", "proposal", ...
+game.battlefields = {}            -- per battlefield slot: "queued", "confirm", "active", ...
+game.sign_ups_waiting = 0         -- sign-ups to premade groups still unanswered
+function GetLFGMode(category) return game.finder_modes[category] end
+function GetMaxBattlefieldID() return 3 end
+function GetBattlefieldStatus(index) return game.battlefields[index] or "none" end
+C_LFGList = { GetNumApplications = function() return game.sign_ups_waiting, game.sign_ups_waiting end }
+
 -- Friends and guild, asked about by GUID. A check fills these tables.
 game.friends, game.battle_net_friends, game.guild = {}, {}, {}
 C_FriendList = { IsFriend = function(guid) called("C_FriendList.IsFriend", guid); return game.friends[guid] == true end }
@@ -215,14 +225,25 @@ end
 FLAVORS = ("retail", "mists", "era")
 
 
+# Settings the addon keeps per character; the rest are shared by the account.
+PER_CHARACTER = ("role",)
+
+
 def load(flavor, saved=None):
-    """A fresh game of the given flavor with the addon loaded and the player logged in."""
+    """A fresh game of the given flavor with the addon loaded and the player logged in.
+
+    saved: the settings left from an earlier session, each going to where the
+    addon keeps it (the account's or this character's).
+    """
     lua = lua51.LuaRuntime(unpack_returned_tuples=True)
     lua.execute(STAND_IN)
     game = lua.globals().game
     game.setup(flavor)
     if saved is not None:
-        lua.globals().AutoAcceptInviteDB = lua.table_from(saved)
+        lua.globals().AutoAcceptInviteDB = lua.table_from({k: v for k, v in saved.items() if k not in PER_CHARACTER})
+        character = {k: v for k, v in saved.items() if k in PER_CHARACTER}
+        if character:
+            lua.globals().AutoAcceptInviteCharDB = lua.table_from(character)
     with open(ADDON, encoding="utf-8") as source:
         lua.execute(source.read())
     game.fire("PLAYER_LOGIN")
@@ -409,6 +430,65 @@ def when_the_game_does_not_say_who_invites_only_everyone_accepts():
         assert game.count("AcceptGroup") == 1
 
 
+def queue_up(game, where):
+    if where == "dungeon finder":
+        game.finder_modes[1] = "queued"
+    elif where == "raid finder, about to pop":
+        game.finder_modes[3] = "proposal"
+    elif where == "battleground":
+        game.battlefields[2] = "queued"
+    elif where == "premade sign-ups":
+        game.sign_ups_waiting = 2
+
+
+QUEUES = ("dungeon finder", "raid finder, about to pop", "battleground", "premade sign-ups")
+
+
+@check
+def leaves_an_invite_for_the_player_while_they_are_in_a_queue():
+    for flavor in FLAVORS:
+        for where in QUEUES:
+            lua, game = load(flavor)
+            queue_up(game, where)
+            invite(game, "Bob")
+            join(game)
+            assert game.count("AcceptGroup") == 0, "%s, %s: accepting would end the queue" % (flavor, where)
+            assert game.count("StaticPopup_Hide") == 0, "the popup is the player's to answer"
+            assert "left the invite from Bob for you" in printed(game)[-1]
+
+
+@check
+def accepts_as_usual_when_not_in_a_queue():
+    lua, game = load("retail")
+    game.finder_modes[1] = "lfgparty"  # in a group the finder made, not waiting for one
+    game.battlefields[1] = "active"    # inside a battleground, not waiting for one
+    invite(game, "Bob")
+    assert game.count("AcceptGroup") == 1
+
+
+@check
+def accepts_while_queued_when_the_player_asks_for_that():
+    for where in QUEUES:
+        lua, game = load("retail", {"evenInQueue": True})
+        queue_up(game, where)
+        invite(game, "Bob")
+        assert game.count("AcceptGroup") == 1, where
+
+
+@check
+def options_panel_has_the_queue_exception_ticked_until_unticked():
+    lua, game = load("retail")
+    panel = [f for f in (game.frames[i] for i in range(1, len(game.frames) + 1)) if f.name == "AutoAcceptInvite"][0]
+    panel.Show(panel)
+    box = game.checkbox("Not while I'm in a queue")
+    assert box.checked is True
+    queue_up(game, "dungeon finder")
+    game.click(box)
+    assert lua.globals().AutoAcceptInviteDB.evenInQueue is True
+    invite(game, "Bob")
+    assert game.count("AcceptGroup") == 1
+
+
 @check
 def commands_only_switch_things_on_and_off():
     # Whose invites and which role are picked in the options panel, not typed.
@@ -418,7 +498,8 @@ def commands_only_switch_things_on_and_off():
     for typed in ("from everyone", "from friends", "queue healer", "role spec", "role"):
         slash(typed)
         assert "usage" in printed(game)[-1], typed
-        assert (db["from"], db.role, db.disabled, db.noAutoQueue) == ("GUILD", "TANK", None, None), typed
+        assert (db["from"], db.disabled, db.noAutoQueue) == ("GUILD", None, None), typed
+        assert lua.globals().AutoAcceptInviteCharDB.role == "TANK", typed
     slash("on")
     assert "accepting party invites from guild members." in printed(game)[-1], "the switch says whose"
     slash("queue")
@@ -748,20 +829,38 @@ def options_panel_lets_the_player_pick_one_role_to_queue_as():
     panel.Show(panel)
     spec, tank, healer, damage = (game.checkbox(label) for label in
                                   ("My current specialization", "Tank", "Healer", "Damage"))
-    db = lua.globals().AutoAcceptInviteDB
-
     def ticked():
         return (spec.checked, tank.checked, healer.checked, damage.checked)
 
+    def picked():
+        return lua.globals().AutoAcceptInviteCharDB.role
+
     assert ticked() == (True, False, False, False), "the specialization's role until one is picked"
     game.click(healer)
-    assert db.role == "HEALER" and ticked() == (False, False, True, False)
+    assert picked() == "HEALER" and ticked() == (False, False, True, False)
     game.click(healer)  # clicking the ticked one again leaves it ticked
-    assert db.role == "HEALER" and ticked() == (False, False, True, False)
+    assert picked() == "HEALER" and ticked() == (False, False, True, False)
     role_check(game)
     assert "accepted the role check as Healer." in printed(game)[-1]
     game.click(spec)
-    assert db.role is None and ticked() == (True, False, False, False)
+    assert picked() is None and ticked() == (True, False, False, False)
+
+
+@check
+def the_role_to_queue_as_is_kept_per_character():
+    lua, game = load("retail", {})
+    panel = [f for f in (game.frames[i] for i in range(1, len(game.frames) + 1)) if f.name == "AutoAcceptInvite"][0]
+    panel.Show(panel)
+    game.click(game.checkbox("Tank"))
+    assert lua.globals().AutoAcceptInviteCharDB.role == "TANK"
+    assert lua.globals().AutoAcceptInviteDB.role is None, "the account's settings are shared with every other character"
+
+    # Another character of the same account: the shared settings carry over, the role does not.
+    lua, game = load("retail", {"quiet": True})
+    lua.globals().AutoAcceptInviteDB.role = "TANK"  # even if an account-wide role were left behind
+    game.spec_role = "HEALER"
+    role_check(game)
+    assert args(game, "SetLFGRoles") == (False, False, True, False), "this character goes by its own specialization"
 
 
 def main():
