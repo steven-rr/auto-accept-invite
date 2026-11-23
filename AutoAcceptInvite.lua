@@ -396,7 +396,7 @@ local function AddCheckboxes()
 		note:SetText("Answers the role window when your group's leader queues, and when you sign up for a group yourself.\n"
 			.. "Hold Shift as you sign up to choose the role or write a note yourself.")
 
-		last = AddChoices(note, "Queue as (this character):", {
+		last = AddChoices(note, "Queue as:", {
 			{ nil, "My current specialization's role" },
 			{ "TANK", RoleName("TANK") },
 			{ "HEALER", RoleName("HEALER") },

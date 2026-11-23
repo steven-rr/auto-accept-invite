@@ -50,7 +50,7 @@ Open **Esc > Options > AddOns > AutoAcceptInvite**, or type `/aai options`.
 - **Not while I'm in a queue**: on by default.
 - **From**: everyone (the default), friends and guild members, friends only, or guild members only.
 - **Automatically queue for me**: on by default. Only shown in game versions that have a dungeon finder.
-- **Queue as (this character)**: my current specialization's role (the default), Tank, Healer or Damage.
+- **Queue as**: my current specialization's role (the default), Tank, Healer or Damage.
 - **Print a chat message when something is accepted**: on by default.
 
 Changes apply as soon as you click. The settings are shared by every character on the account, except **Queue as**, which each character keeps for itself.
