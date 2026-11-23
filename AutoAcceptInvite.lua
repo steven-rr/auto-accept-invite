@@ -1,11 +1,11 @@
 -- AutoAcceptInvite: accepts incoming party/raid invites, from everyone or only
--- from friends and guild members, and, when asked to, the role check that
--- appears when your group's leader queues.
+-- from friends and guild members, and, when asked to, answers the window that
+-- asks for your role when your group's leader queues or you sign up for a group.
 --
 -- Options panel: Esc > Options > AddOns > AutoAcceptInvite
 -- /aai            toggle invites on/off
 -- /aai on|off     enable / disable invites
--- /aai role       toggle role checks on/off
+-- /aai role       toggle answering role windows on/off
 -- /aai options    open the options panel, where whose invites and which role
 --                 are picked
 
@@ -22,7 +22,7 @@ local PREFIX = "|cff33ff99AutoAcceptInvite|r: "
 --   AutoAcceptInviteDB.from         whose invites to accept: "FRIENDS_GUILD",
 --                                   "FRIENDS" or "GUILD"; unset = everyone's
 --   AutoAcceptInviteDB.quiet        true = no chat line when accepting
---   AutoAcceptInviteDB.roleChecks   true = also accept role checks
+--   AutoAcceptInviteDB.roleWindows  true = also answer the game's role windows
 --   AutoAcceptInviteDB.role         the role to accept them as: "TANK", "HEALER"
 --                                   or "DAMAGER"; unset = the current
 --                                   specialization's role
@@ -49,8 +49,8 @@ local function AcceptsFrom()
 	end
 end
 
-local function AcceptsRoleChecks()
-	return GetDB().roleChecks == true
+local function AnswersRoleWindows()
+	return GetDB().roleWindows == true
 end
 
 -- The role picked in the options, or nil for "my current specialization's role".
@@ -102,15 +102,16 @@ local function IsWelcome(guid)
 end
 
 ------------------------------------------------------------------------
--- Role checks
+-- Role windows
 ------------------------------------------------------------------------
--- A role check is the window that asks for your role when your group's leader
--- queues for a dungeon or battleground, or signs the group up for a premade
--- group. Game versions without a dungeon finder have the functions below but
--- not the window, and never start one. Known at login, once the game's own
--- interface is loaded.
+-- Two windows of the game ask for your role, and one option answers both:
+--   the role check, when your group's leader queues for a dungeon or
+--     battleground, or signs the group up for a premade group;
+--   the sign-up window, when you sign up for a premade group yourself.
+-- Game versions without a dungeon finder have the functions below but neither
+-- window. Known at login, once the game's own interface is loaded.
 
-local hasRoleChecks = false
+local hasRoleWindows = false
 
 -- The role of the specialization being played, as the game spells it: "TANK",
 -- "HEALER" or "DAMAGER". Nil when it cannot be told, for example before a
@@ -156,15 +157,34 @@ local function RoleName(role)
 	return RoleNames(role == "TANK", role == "HEALER", role == "DAMAGER")
 end
 
+-- The role to answer a role window with: the one picked in the options, or
+-- else the current specialization's. With neither to go by it is nil, and the
+-- ticks the game already holds are used as they are.
+local function RoleToAnswerWith()
+	return ChosenRole() or SpecRole()
+end
+
+-- Whether that role, and no other, is what is ticked. When it is not, the game
+-- did not take the role, for example one this character's class cannot fill.
+-- Answering would then send whatever was ticked before, so the window is left
+-- to the player.
+local function TookRole(role, tank, healer, damage, window)
+	local onlyRoleTicked = (not tank) == (role ~= "TANK")
+		and (not healer) == (role ~= "HEALER")
+		and (not damage) == (role ~= "DAMAGER")
+	if not onlyRoleTicked and IsChatty() then
+		print(PREFIX .. "could not set your role to " .. RoleName(role) .. ", so the " .. window .. " is left for you.")
+	end
+	return onlyRoleTicked
+end
+
 -- Answers the role check the way the window's own Accept button does: store
 -- which roles are ticked, then accept. Returns the roles as words for the chat
 -- line, or nil when the role check is left to the player.
 local function AcceptRoleCheck()
 	local isBattleground = select(6, GetLFGRoleUpdate())
 
-	-- With neither a picked role nor a specialization to go by, the ticks the
-	-- game already holds are used as they are.
-	local role = ChosenRole() or SpecRole()
+	local role = RoleToAnswerWith()
 	if role then
 		SetTicks(isBattleground, role == "TANK", role == "HEALER", role == "DAMAGER")
 	end
@@ -172,17 +192,7 @@ local function AcceptRoleCheck()
 	-- Read the ticks back instead of trusting them: what is ticked now is what
 	-- the game sends, and all the chat line may claim.
 	local tank, healer, damage = GetTicks(isBattleground)
-
-	local onlyRoleTicked = (not tank) == (role ~= "TANK")
-		and (not healer) == (role ~= "HEALER")
-		and (not damage) == (role ~= "DAMAGER")
-	if role and not onlyRoleTicked then
-		-- The game did not take the role, for example a role this character's
-		-- class cannot fill. Accepting would send whatever was ticked before,
-		-- so leave the window to the player.
-		if IsChatty() then
-			print(PREFIX .. "could not set your role to " .. RoleName(role) .. ", so the role check is left for you.")
-		end
+	if role and not TookRole(role, tank, healer, damage, "role check") then
 		return
 	end
 
@@ -200,6 +210,40 @@ end
 local function HideRoleCheckWindow()
 	if LFDRoleCheckPopup and StaticPopupSpecial_Hide then
 		StaticPopupSpecial_Hide(LFDRoleCheckPopup)
+	end
+end
+
+-- Presses Sign Up in the window the game opens when you sign up for a premade
+-- group yourself. Signing up needs a real click; the click that opened the
+-- window still counts while it opens, so this runs as the window shows.
+-- Holding Shift leaves the window alone, to change role or write a note.
+local function AnswerSignUpWindow(window)
+	if not AnswersRoleWindows() or IsShiftKeyDown() then return end
+
+	local role = RoleToAnswerWith()
+	if role then
+		SetTicks(false, role == "TANK", role == "HEALER", role == "DAMAGER")
+		-- Have the window show the new ticks: they are what Sign Up sends.
+		if LFGListApplicationDialog_UpdateRoles then
+			LFGListApplicationDialog_UpdateRoles(window)
+		end
+	end
+
+	-- A role this character cannot fill has no button in the window.
+	local function IsTicked(button)
+		return button:IsShown() and button.CheckButton:GetChecked() and true or false
+	end
+	local tank, healer, damage = IsTicked(window.TankButton), IsTicked(window.HealerButton), IsTicked(window.DamagerButton)
+	if role and not TookRole(role, tank, healer, damage, "sign-up window") then
+		return
+	end
+
+	-- The game greys Sign Up out while no role is ticked.
+	if not window.SignUpButton:IsEnabled() then return end
+
+	window.SignUpButton:Click()
+	if IsChatty() then
+		print(PREFIX .. "signed up as " .. RoleNames(tank, healer, damage) .. ".")
 	end
 end
 
@@ -257,10 +301,12 @@ end
 -- A heading with a list of choices under it, indented below a checkbox. One
 -- choice is always ticked: clicking one picks it, and the refresh unticks the
 -- others. choices: { value, label } each; a nil value is the choice in force
--- while nothing is saved. Returns the last row, to place what comes below.
-local function AddChoices(anchor, heading, choices, getChoice, setChoice)
+-- while nothing is saved. x: left out when straight under a checkbox, 0 when
+-- under something already indented. Returns the last row, to place what comes
+-- below.
+local function AddChoices(anchor, heading, choices, getChoice, setChoice, x)
 	local text = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-	text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", INDENT, -4)
+	text:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", x or INDENT, -4)
 	text:SetText(heading)
 
 	local last = text
@@ -276,7 +322,7 @@ local function AddChoices(anchor, heading, choices, getChoice, setChoice)
 	return last
 end
 
--- Called at login, when it is known whether this game version has role checks.
+-- Called at login, when it is known whether this game version has role windows.
 local function AddCheckboxes()
 	local last = AddCheckbox(subtitle, "Auto-accept invites", IsEnabled, function(checked)
 		GetDB().disabled = not checked
@@ -291,19 +337,25 @@ local function AddCheckboxes()
 		GetDB().from = from
 	end)
 
-	if hasRoleChecks then
-		last = AddCheckbox(last, "Auto-accept role checks when your group's leader queues", AcceptsRoleChecks, function(checked)
-			GetDB().roleChecks = checked
+	if hasRoleWindows then
+		last = AddCheckbox(last, "Answer the role window for me", AnswersRoleWindows, function(checked)
+			GetDB().roleWindows = checked
 		end, -INDENT)
 
-		last = AddChoices(last, "Queue as:", {
+		local note = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+		note:SetPoint("TOPLEFT", last, "BOTTOMLEFT", INDENT, 0)
+		note:SetJustifyH("LEFT")
+		note:SetText("When your group's leader queues, and when you sign up for a group yourself.\n"
+			.. "Hold Shift while signing up to answer it yourself.")
+
+		last = AddChoices(note, "Queue as:", {
 			{ nil, "My current specialization's role" },
 			{ "TANK", RoleName("TANK") },
 			{ "HEALER", RoleName("HEALER") },
 			{ "DAMAGER", RoleName("DAMAGER") },
 		}, ChosenRole, function(role)
 			GetDB().role = role
-		end)
+		end, 0)
 	end
 
 	AddCheckbox(last, "Print a chat message when something is accepted", IsChatty, function(checked)
@@ -347,7 +399,7 @@ local function OpenOptions()
 end
 
 ------------------------------------------------------------------------
--- Accepting invites and role checks
+-- Accepting invites and answering role windows
 ------------------------------------------------------------------------
 
 local frame = CreateFrame("Frame")
@@ -356,10 +408,14 @@ frame:RegisterEvent("PARTY_INVITE_REQUEST")
 
 frame:SetScript("OnEvent", function(self, event, ...)
 	if event == "PLAYER_LOGIN" then
-		hasRoleChecks = CompleteLFGRoleCheck ~= nil and LFDRoleCheckPopup ~= nil
-		if hasRoleChecks then
+		local hasRoleCheck = CompleteLFGRoleCheck ~= nil and LFDRoleCheckPopup ~= nil
+		if hasRoleCheck then
 			self:RegisterEvent("LFG_ROLE_CHECK_SHOW")
 		end
+		if LFGListApplicationDialog then
+			LFGListApplicationDialog:HookScript("OnShow", AnswerSignUpWindow)
+		end
+		hasRoleWindows = hasRoleCheck or LFGListApplicationDialog ~= nil
 		AddCheckboxes()
 		RegisterPanel()
 	elseif event == "PARTY_INVITE_REQUEST" then
@@ -397,7 +453,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			StaticPopupSpecial_Hide(LFGInvitePopup)
 		end
 	elseif event == "LFG_ROLE_CHECK_SHOW" then
-		local roles = AcceptsRoleChecks() and AcceptRoleCheck()
+		local roles = AnswersRoleWindows() and AcceptRoleCheck()
 		if roles then
 			-- On the next frame, because the game may not have opened the
 			-- window yet when this runs.
@@ -427,19 +483,19 @@ SlashCmdList["AUTOACCEPTINVITE"] = function(msg)
 	-- Commands only switch things on and off. Whose invites and which role are
 	-- picked in the options panel.
 	if msg == "role" or msg == "roles" then
-		if not hasRoleChecks then
-			print(PREFIX .. "this game version has no role checks.")
+		if not hasRoleWindows then
+			print(PREFIX .. "this game version has no role windows.")
 			return
 		end
 
-		db.roleChecks = not AcceptsRoleChecks()
+		db.roleWindows = not AnswersRoleWindows()
 		RefreshPanel()
 
 		local as = ChosenRole() and RoleName(ChosenRole()) or "your current specialization's role"
-		if AcceptsRoleChecks() then
-			print(PREFIX .. "role checks |cff00ff00ON|r - accepting them as " .. as .. ".")
+		if AnswersRoleWindows() then
+			print(PREFIX .. "role windows |cff00ff00ON|r - answering them as " .. as .. ".")
 		else
-			print(PREFIX .. "role checks |cffff0000OFF|r - they will show the normal window. When on: as " .. as .. ".")
+			print(PREFIX .. "role windows |cffff0000OFF|r - they are left for you to answer. When on: as " .. as .. ".")
 		end
 		return
 	end
