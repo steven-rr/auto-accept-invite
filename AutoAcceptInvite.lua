@@ -154,7 +154,7 @@ end
 -- Game versions without a dungeon finder have the functions below but neither
 -- window. Known at login, once the game's own interface is loaded.
 
-local hasRoleWindows = false
+local hasGroupFinder = false
 
 -- The role of the specialization being played, as the game spells it: "TANK",
 -- "HEALER" or "DAMAGER". Nil when it cannot be told, for example before a
@@ -364,17 +364,23 @@ local function AddChoices(anchor, heading, choices, getChoice, setChoice, x)
 	return last
 end
 
--- Called at login, when it is known whether this game version has role windows.
+-- Called at login, when it is known whether this game version has a group
+-- finder. Without one there is nothing to queue for, and nothing about queues
+-- is shown.
 local function AddCheckboxes()
 	local last = AddCheckbox(subtitle, "Auto-accept invites", IsEnabled, function(checked)
 		GetDB().disabled = not checked
 	end)
 
-	last = AddCheckbox(last, "Not while I'm in a queue (accepting takes me out of it)", function()
-		return not AcceptsWhileQueued()
-	end, function(checked)
-		GetDB().evenInQueue = not checked
-	end, INDENT, 0, 22)
+	local x = INDENT
+	if hasGroupFinder then
+		last = AddCheckbox(last, "Not while I'm in a queue (accepting takes me out of it)", function()
+			return not AcceptsWhileQueued()
+		end, function(checked)
+			GetDB().evenInQueue = not checked
+		end, INDENT, 0, 22)
+		x = 0
+	end
 
 	last = AddChoices(last, "From:", {
 		{ nil, "Everyone" },
@@ -383,9 +389,9 @@ local function AddCheckboxes()
 		{ "GUILD", "Guild members only" },
 	}, AcceptsFrom, function(from)
 		GetDB().from = from
-	end, 0)
+	end, x)
 
-	if hasRoleWindows then
+	if hasGroupFinder then
 		last = AddCheckbox(last, "Automatically queue for me", QueuesForMe, function(checked)
 			GetDB().noAutoQueue = not checked
 		end, -INDENT)
@@ -463,7 +469,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		if LFGListApplicationDialog then
 			LFGListApplicationDialog:HookScript("OnShow", AnswerSignUpWindow)
 		end
-		hasRoleWindows = hasRoleCheck or LFGListApplicationDialog ~= nil
+		hasGroupFinder = hasRoleCheck or LFGListApplicationDialog ~= nil
 		AddCheckboxes()
 		RegisterPanel()
 	elseif event == "PARTY_INVITE_REQUEST" then
@@ -480,7 +486,7 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			who = " from " .. inviter
 		end
 
-		if not AcceptsWhileQueued() and WouldLeaveQueue() then
+		if hasGroupFinder and not AcceptsWhileQueued() and WouldLeaveQueue() then
 			Announce("queued", "left the invite" .. who .. " for you: accepting it takes you out of your queue.",
 				"/aai options to change this.")
 			return
@@ -534,7 +540,7 @@ SlashCmdList["AUTOACCEPTINVITE"] = function(msg)
 	-- Commands only switch things on and off. Whose invites and which role are
 	-- picked in the options panel.
 	if msg == "queue" then
-		if not hasRoleWindows then
+		if not hasGroupFinder then
 			print(PREFIX .. "this game version has no group finder to queue in.")
 			return
 		end

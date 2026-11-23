@@ -457,7 +457,7 @@ QUEUES = ("dungeon finder", "raid finder, about to pop", "battleground", "premad
 
 @check
 def leaves_an_invite_for_the_player_while_they_are_in_a_queue():
-    for flavor in FLAVORS:
+    for flavor in ("retail", "mists"):
         for where in QUEUES:
             lua, game = load(flavor)
             queue_up(game, where)
@@ -809,10 +809,12 @@ def slash_queue_switches_queueing_off_and_on():
 
 
 @check
-def game_versions_without_role_checks_show_no_role_option():
+def game_versions_without_a_group_finder_show_nothing_about_queues():
     lua, game = load("era", {})
     assert game.checkbox("Automatically queue for me") is None
+    assert game.checkbox("Not while I'm in a queue") is None
     assert game.checkbox("Auto-accept invites") is not None
+    assert game.checkbox("Everyone") is not None
     assert game.checkbox("Print a chat message") is not None
     lua.globals().SlashCmdList["AUTOACCEPTINVITE"]("queue")
     assert "no group finder" in printed(game)[-1]
