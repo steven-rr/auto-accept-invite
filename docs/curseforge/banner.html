@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AutoAcceptInvite banner</title>
+<style>
+  /* Rendered to banner.png at 1600x480 by render.ps1. Colours follow logo.png: black, gold, green tick. */
+  :root {
+    --black: #08080a;
+    --panel: #121216;
+    --gold: #f4b63a;
+    --gold-light: #ffe29a;
+    --gold-dark: #a8650f;
+    --green: #4be04b;
+    --text: #e9e6df;
+    --muted: #a39e93;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1600px; height: 480px; background: var(--black); overflow: hidden; }
+  body { font-family: "Segoe UI", Arial, sans-serif; color: var(--text); }
+
+  .banner {
+    position: relative; width: 1600px; height: 480px;
+    background:
+      radial-gradient(520px 380px at 250px 240px, rgba(244, 182, 58, 0.20), transparent 70%),
+      radial-gradient(520px 360px at 1340px 250px, rgba(75, 224, 75, 0.10), transparent 70%),
+      linear-gradient(180deg, #0d0d10 0%, var(--black) 100%);
+  }
+  .frame {
+    position: absolute; inset: 14px; border-radius: 34px;
+    border: 2px solid rgba(244, 182, 58, 0.55);
+    box-shadow: 0 0 26px rgba(244, 182, 58, 0.22), inset 0 0 40px rgba(244, 182, 58, 0.06);
+  }
+
+  /* "lighten" lets the logo's black corners take the banner's own background. */
+  .logo { position: absolute; left: 78px; top: 70px; width: 340px; height: 340px; mix-blend-mode: lighten; }
+
+  .copy { position: absolute; left: 470px; top: 104px; width: 620px; }
+  h1 {
+    font-family: "Bahnschrift", "Segoe UI", sans-serif; font-weight: 700; font-size: 82px; line-height: 1;
+    letter-spacing: -1px;
+    background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 48%, var(--gold-dark) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 3px 10px rgba(244, 182, 58, 0.28));
+  }
+  .tagline { margin-top: 26px; font-size: 33px; line-height: 1.3; color: var(--text); }
+  .chips { margin-top: 34px; display: flex; gap: 14px; }
+  .chip {
+    font-size: 23px; padding: 9px 20px; border-radius: 999px; color: var(--gold-light);
+    border: 1.5px solid rgba(244, 182, 58, 0.5); background: rgba(244, 182, 58, 0.07);
+  }
+  .chip code { font-family: Consolas, monospace; color: #fff; }
+
+  /* A drawing of an invite, not a screenshot of the game. */
+  .invite {
+    position: absolute; right: 78px; top: 96px; width: 384px; padding: 30px 30px 28px;
+    border-radius: 22px; background: linear-gradient(180deg, #17171c 0%, var(--panel) 100%);
+    border: 1.5px solid rgba(244, 182, 58, 0.45);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+  }
+  .invite .label { font-size: 19px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); }
+  .invite .who { margin-top: 12px; font-size: 30px; line-height: 1.3; }
+  .invite .who b { color: var(--gold-light); font-weight: 600; }
+  .buttons { margin-top: 26px; display: flex; gap: 14px; }
+  .btn { flex: 1; text-align: center; font-size: 25px; padding: 13px 0; border-radius: 12px; }
+  .btn.decline { color: #6e6a62; border: 1.5px solid #2c2c33; }
+  .btn.accept {
+    color: #06210a; font-weight: 700; background: linear-gradient(180deg, #8dff7a 0%, var(--green) 100%);
+    box-shadow: 0 0 22px rgba(75, 224, 75, 0.55);
+  }
+  .done { margin-top: 20px; font-size: 22px; color: var(--green); }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="frame"></div>
+    <img class="logo" src="logo.png" alt="">
+    <div class="copy">
+      <h1>AutoAcceptInvite</h1>
+      <p class="tagline">Accepts every party and raid invite<br>the moment it arrives.</p>
+      <div class="chips">
+        <span class="chip"><code>/aai</code> on and off</span>
+        <span class="chip">No setup</span>
+        <span class="chip">Retail and Classic</span>
+      </div>
+    </div>
+    <div class="invite">
+      <div class="label">Group invite</div>
+      <div class="who"><b>A friend</b> invites you<br>to a group.</div>
+      <div class="buttons">
+        <div class="btn accept">&#10003; Accept</div>
+        <div class="btn decline">Decline</div>
+      </div>
+      <div class="done">Accepted for you, instantly.</div>
+    </div>
+  </div>
+</body>
+</html>
