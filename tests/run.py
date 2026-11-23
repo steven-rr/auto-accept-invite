@@ -199,6 +199,38 @@ function game.sign_up()
     for _, hook in ipairs(window.hooks) do hook(window) end
 end
 
+-- The list of premade groups. A click on a group selects it, unless it is a
+-- right click; the list's own Sign Up button is greyed out when the selected
+-- group cannot be signed up for.
+game.now = 100
+game.can_sign_up = true
+function GetTime() return game.now end
+
+function game.new_group_list()
+    LFGListFrame = { SearchPanel = { SignUpButton = { IsEnabled = function() return game.can_sign_up end } } }
+    function LFGListSearchEntry_OnClick(entry, button)
+        if button ~= "RightButton" then LFGListFrame.SearchPanel.selectedResult = entry.resultID end
+    end
+    function LFGListSearchPanel_SignUp(list)
+        called("LFGListSearchPanel_SignUp", list.selectedResult)
+        game.sign_up()
+    end
+end
+
+-- The game's way for an addon to run its own function after one of the game's.
+function hooksecurefunc(name, hook)
+    local original = _G[name]
+    _G[name] = function(...)
+        original(...)
+        hook(...)
+    end
+end
+
+-- The player's click on a group in the list.
+function game.click_group(id, button)
+    LFGListSearchEntry_OnClick({ resultID = id }, button or "LeftButton")
+end
+
 function game.setup(flavor)
     game.known_events = { PLAYER_LOGIN = true, PARTY_INVITE_REQUEST = true, GROUP_ROSTER_UPDATE = true,
                           LFG_ROLE_CHECK_SHOW = true }
@@ -222,6 +254,7 @@ function game.setup(flavor)
         }
         LFGInvitePopup = { name = "LFGInvitePopup" }
         LFGListApplicationDialog = game.new_sign_up_window()
+        game.new_group_list()
         function issecretvalue(value) return value == game.secret end
         -- Retail can have character friends switched off, and says so.
         game.character_friends_enabled = true
@@ -766,6 +799,68 @@ def signing_up_is_quiet_when_chat_messages_are_off():
     game.sign_up()
     assert game.count("ApplyToGroup") == 1
     assert printed(game) == []
+
+
+def double_click(game, group=7, button="LeftButton", apart=0.2):
+    game.click_group(group, button)
+    game.now = game.now + apart
+    game.click_group(group, button)
+
+
+@check
+def double_clicking_a_group_signs_up_for_it():
+    lua, game = load("retail")
+    game.spec_role = "HEALER"
+    game.click_group(7)
+    assert game.count("LFGListSearchPanel_SignUp") == 0, "one click only selects, as always"
+    game.now = game.now + 0.2
+    game.click_group(7)
+    assert game.last("LFGListSearchPanel_SignUp")[1] == 7
+    assert args(game, "ApplyToGroup") == (False, True, False)
+    assert "signed up as Healer." in printed(game)[-1]
+    game.now = game.now + 0.2
+    game.click_group(7)
+    assert game.count("LFGListSearchPanel_SignUp") == 1, "a third click starts over, it does not sign up again"
+
+
+@check
+def clicks_that_are_not_a_double_click_only_select():
+    lua, game = load("retail")
+    double_click(game, apart=1.0)  # too slow
+    game.now = game.now + 5
+    game.click_group(7)
+    game.now = game.now + 0.1
+    game.click_group(8)  # two different groups
+    game.now = game.now + 5
+    double_click(game, button="RightButton")  # the right button opens the game's menu
+    assert game.count("LFGListSearchPanel_SignUp") == 0
+
+
+@check
+def double_clicking_does_no_more_than_the_sign_up_button_would():
+    lua, game = load("retail")
+    game.can_sign_up = False  # the game greys Sign Up out, for a group already signed up for, say
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 0
+
+    lua, game = load("retail", {"noAutoQueue": True})
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 0, "switched off, a double-click is just two clicks"
+
+    lua, game = load("retail")
+    game.secret = 7  # the game is hiding this group's details from addons
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 0
+
+
+@check
+def double_clicking_with_shift_opens_the_sign_up_window_and_leaves_it():
+    lua, game = load("retail")
+    game.shift = True
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 1
+    assert game.count("ApplyToGroup") == 0
+    assert sign_up_window(lua).is_open is True
 
 
 def panel_texts(game):

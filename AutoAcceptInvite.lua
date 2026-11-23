@@ -289,6 +289,36 @@ local function AnswerSignUpWindow(window)
 		"Hold Shift as you sign up to choose the role or write a note yourself. /aai options to change this.")
 end
 
+-- Double-clicking a group in the premade list signs up for it, the same as
+-- selecting it and pressing Sign Up. The game runs this after each click on a
+-- group; two on the same group in quick succession are a double-click.
+local DOUBLE_CLICK_SECONDS = 0.4
+local lastGroup, lastClickAt
+
+local function OnGroupClicked(entry, button)
+	if not QueuesForMe() or button == "RightButton" then return end
+
+	-- The game can hide a group's details from addons; then there is nothing
+	-- to compare, and the click is left to the game.
+	local group = entry.resultID
+	if group == nil or (issecretvalue and issecretvalue(group)) then return end
+
+	local now = GetTime()
+	if group ~= lastGroup or now - lastClickAt > DOUBLE_CLICK_SECONDS then
+		lastGroup, lastClickAt = group, now
+		return
+	end
+	lastGroup = nil
+
+	-- The first click made the game select the group, if it can be signed up
+	-- for; its own Sign Up button is greyed out when it cannot. Go by both,
+	-- so that this never does more than pressing that button would.
+	local list = LFGListFrame and LFGListFrame.SearchPanel
+	if list and list.selectedResult == group and list.SignUpButton and list.SignUpButton:IsEnabled() then
+		LFGListSearchPanel_SignUp(list)
+	end
+end
+
 ------------------------------------------------------------------------
 -- Options panel
 ------------------------------------------------------------------------
@@ -398,12 +428,13 @@ local function AddCheckboxes()
 
 		-- Describe only the role windows this game version has: one with a role
 		-- check does not always have the sign-up window too.
-		local shiftTip = "\nHold Shift as you sign up to choose the role or write a note yourself."
+		local signUpTips = "\nDouble-click a group in the list to sign up for it."
+			.. "\nHold Shift as you sign up to choose the role or write a note yourself."
 		local explanation
 		if LFDRoleCheckPopup and LFGListApplicationDialog then
-			explanation = "Answers the role window when your group's leader queues, and when you sign up for a group yourself." .. shiftTip
+			explanation = "Answers the role window when your group's leader queues, and when you sign up for a group yourself." .. signUpTips
 		elseif LFGListApplicationDialog then
-			explanation = "Answers the role window when you sign up for a group yourself." .. shiftTip
+			explanation = "Answers the role window when you sign up for a group yourself." .. signUpTips
 		else
 			explanation = "Answers the role window when your group's leader queues."
 		end
@@ -479,6 +510,9 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		end
 		if LFGListApplicationDialog then
 			LFGListApplicationDialog:HookScript("OnShow", AnswerSignUpWindow)
+			if LFGListSearchEntry_OnClick and LFGListSearchPanel_SignUp then
+				hooksecurefunc("LFGListSearchEntry_OnClick", OnGroupClicked)
+			end
 		end
 		hasGroupFinder = hasRoleCheck or LFGListApplicationDialog ~= nil
 		AddCheckboxes()

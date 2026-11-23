@@ -31,7 +31,7 @@ An invite from anyone else gets the normal popup, for you to answer.
 The game asks for your role in two windows. With **Automatically queue for me** on, as it is unless you switch it off, the addon answers both, and the chat line names the role it answered with:
 
 - **The role check**, when your group's leader queues for a dungeon or battleground, or signs the group up for a premade group.
-- **The sign-up window**, when you sign up for a premade group yourself. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
+- **The sign-up window**, when you sign up for a premade group yourself. You can also double-click a group in the list to sign up for it, instead of selecting it and pressing Sign Up. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
 
 You choose which role it queues you as, under **Queue as** in the options. This one choice is kept per character, so your tank can always queue as tank while your other characters follow their specialization:
 
