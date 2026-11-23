@@ -1,6 +1,6 @@
 ## Interface: 120105, 120107, 16001, 11509, 20506, 50504
 ## Title: AutoAcceptInvite
-## Notes: Automatically accepts every incoming party invite. /aai to toggle, /aai options for settings.
+## Notes: Automatically accepts party invites, from everyone or only friends and guild, and role checks if you want. /aai to toggle, /aai options for settings.
 ## Author: stevenrivadeneira
 ## Version: 1.0.0
 ## SavedVariables: AutoAcceptInviteDB
