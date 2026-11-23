@@ -467,7 +467,7 @@ local function AddCheckboxes()
 
 	-- Only where the game has the list of premade groups to double-click in.
 	if LFGListApplicationDialog and LFGListSearchEntry_OnClick and LFGListSearchPanel_SignUp then
-		AddCheckbox(last, "Double-click a group in the list to sign up for it", DoubleClickSignsUp, function(checked)
+		AddCheckbox(last, "Double-click a group in the LFG list to sign up for it", DoubleClickSignsUp, function(checked)
 			GetDB().noDoubleClick = not checked
 		end)
 	end
