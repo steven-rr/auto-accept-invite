@@ -7,9 +7,9 @@ A tiny World of Warcraft addon that automatically accepts every incoming party o
 ## What it does
 
 - Accepts a group invite the moment it arrives, and closes the invite popup once you have joined.
-- Can also answer the window that asks for your role, when your group's leader queues and when you sign up for a group yourself. This is off until you switch it on.
-- Prints a line in chat saying what was accepted. This can be turned off.
-- Can be switched off at any time to get the normal invite popup back.
+- Queues for you: it answers the window that asks for your role, when your group's leader queues and when you sign up for a group yourself.
+- Prints a line in chat saying what it did. The first line also says how to change it. The lines can be turned off.
+- Each part can be switched off at any time, to get the game's normal windows back.
 
 Out of the box it accepts **every** invite. That includes invites from players you don't know, and invites that arrive while you are queued for a dungeon, which takes you out of the queue. Switch it off when you don't want that.
 
@@ -24,9 +24,9 @@ Under **From** in the options you choose whose invites it accepts:
 
 An invite from anyone else gets the normal popup, for you to answer.
 
-### Role windows
+### Queueing for you
 
-The game asks for your role in two windows. With **Answer the role window for me** on, the addon answers both, and the chat line names the role it answered with:
+The game asks for your role in two windows. With **Automatically queue for me** on, as it is unless you switch it off, the addon answers both, and the chat line names the role it answered with:
 
 - **The role check**, when your group's leader queues for a dungeon or battleground, or signs the group up for a premade group.
 - **The sign-up window**, when you sign up for a premade group yourself. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
@@ -46,7 +46,7 @@ Open **Esc > Options > AddOns > AutoAcceptInvite**, or type `/aai options`.
 
 - **Auto-accept invites**: on by default.
 - **From**: everyone (the default), friends and guild members, friends only, or guild members only.
-- **Answer the role window for me**: off by default. Only shown in game versions that have a dungeon finder.
+- **Automatically queue for me**: on by default. Only shown in game versions that have a dungeon finder.
 - **Queue as**: my current specialization's role (the default), Tank, Healer or Damage.
 - **Print a chat message when something is accepted**: on by default.
 
@@ -57,7 +57,7 @@ Changes apply as soon as you click, and the settings are shared by every charact
 - `/aai`: turn auto-accepting invites on or off
 - `/aai on`: turn it on
 - `/aai off`: turn it off
-- `/aai role`: turn answering role windows on or off
+- `/aai queue`: turn queueing for you on or off
 - `/aai options`: open the options panel
 
 ## Installation

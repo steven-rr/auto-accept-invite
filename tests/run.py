@@ -266,7 +266,7 @@ def accepts_an_invite_and_says_whose():
         lua, game = load(flavor)
         invite(game, "Bob")
         assert game.count("AcceptGroup") == 1, flavor
-        assert printed(game)[-1].endswith("accepted invite from Bob."), flavor
+        assert "accepted invite from Bob." in printed(game)[-1], flavor
 
 
 @check
@@ -307,7 +307,7 @@ def does_not_read_a_secret_inviter_name():
     game.secret = "Bob"
     invite(game, "Bob")
     assert game.count("AcceptGroup") == 1
-    assert printed(game)[-1].endswith("accepted invite.")
+    assert "accepted invite." in printed(game)[-1]
 
 
 @check
@@ -415,14 +415,35 @@ def commands_only_switch_things_on_and_off():
     lua, game = load_with_people("retail", {"from": "GUILD", "role": "TANK"})
     slash = lua.globals().SlashCmdList["AUTOACCEPTINVITE"]
     db = lua.globals().AutoAcceptInviteDB
-    for typed in ("from everyone", "from friends", "role healer", "role spec"):
+    for typed in ("from everyone", "from friends", "queue healer", "role spec", "role"):
         slash(typed)
         assert "usage" in printed(game)[-1], typed
-        assert (db["from"], db.role, db.disabled, db.roleWindows) == ("GUILD", "TANK", None, None), typed
+        assert (db["from"], db.role, db.disabled, db.noAutoQueue) == ("GUILD", "TANK", None, None), typed
     slash("on")
-    assert printed(game)[-1].endswith("accepting party invites from guild members."), "the switch says whose"
-    slash("role")
-    assert printed(game)[-1].endswith("answering them as Tank."), "the switch says which role"
+    assert "accepting party invites from guild members." in printed(game)[-1], "the switch says whose"
+    slash("queue")
+    slash("queue")
+    assert "ON" in printed(game)[-1] and "as Tank." in printed(game)[-1], "the switch says which role"
+
+
+@check
+def the_first_chat_line_of_each_kind_says_how_to_change_it():
+    lua, game = load("retail", {})
+    invite(game, "Bob")
+    assert printed(game)[-1].endswith("accepted invite from Bob. /aai options to change this.")
+    invite(game, "Ann")
+    assert printed(game)[-1].endswith("accepted invite from Ann."), "only the first one carries the hint"
+
+    role_check(game)
+    assert printed(game)[-1].endswith("accepted the role check as Damage. /aai options to change this.")
+    role_check(game)
+    assert printed(game)[-1].endswith("accepted the role check as Damage.")
+
+    game.sign_up()
+    assert "signed up as Damage. Hold Shift as you sign up" in printed(game)[-1]
+    assert printed(game)[-1].endswith("/aai options to change this.")
+    game.sign_up()
+    assert printed(game)[-1].endswith("signed up as Damage.")
 
 
 @check
@@ -453,8 +474,16 @@ def role_check(game):
 
 
 @check
-def leaves_role_checks_alone_until_switched_on():
+def queues_for_the_player_without_any_setup():
     lua, game = load("retail")
+    role_check(game)
+    game.sign_up()
+    assert game.count("CompleteLFGRoleCheck") == 1 and game.count("ApplyToGroup") == 1
+
+
+@check
+def leaves_role_checks_alone_when_switched_off():
+    lua, game = load("retail", {"noAutoQueue": True})
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 0
     assert printed(game) == []
@@ -469,14 +498,14 @@ def args(game, name):
 @check
 def accepts_a_role_check_as_the_current_specializations_role():
     for flavor in ("retail", "mists"):
-        lua, game = load(flavor, {"roleWindows": True})
+        lua, game = load(flavor, {})
         game.spec_role = "HEALER"
         game.roles = lua.table_from([True, True, False, False])  # group leader, and a tank tick left from last time
         role_check(game)
         assert args(game, "SetLFGRoles") == (True, False, True, False), "healer only, leader tick untouched"
         assert game.count("SetPVPRoles") == 0, flavor
         assert game.last("CompleteLFGRoleCheck")[1] is True, flavor
-        assert printed(game)[-1].endswith("accepted the role check as Healer."), flavor
+        assert "accepted the role check as Healer." in printed(game)[-1], flavor
         assert game.count("StaticPopupSpecial_Hide") == 0, "the game may not have opened the window yet"
         game.next_frame()
         assert game.last("StaticPopupSpecial_Hide")[1].name == "LFDRoleCheckPopup", flavor
@@ -487,16 +516,16 @@ def accepts_as_the_role_picked_in_the_options():
     for role, sent, name in (("TANK", (False, True, False, False), "Tank"),
                              ("HEALER", (False, False, True, False), "Healer"),
                              ("DAMAGER", (False, False, False, True), "Damage")):
-        lua, game = load("retail", {"roleWindows": True, "role": role})
+        lua, game = load("retail", {"role": role})
         game.spec_role = "HEALER" if role != "HEALER" else "TANK"
         role_check(game)
         assert args(game, "SetLFGRoles") == sent, "the picked role, not the specialization's"
-        assert printed(game)[-1].endswith("accepted the role check as %s." % name)
+        assert "accepted the role check as %s." % name in printed(game)[-1]
 
 
 @check
 def never_accepts_with_a_role_the_game_did_not_take():
-    lua, game = load("retail", {"roleWindows": True, "role": "TANK"})
+    lua, game = load("retail", {"role": "TANK"})
     game.ignores_set_roles = True  # say, a class that cannot tank: the damage tick from last time stays
     role_check(game)
     game.next_frame()
@@ -508,17 +537,17 @@ def never_accepts_with_a_role_the_game_did_not_take():
 
 @check
 def with_no_role_picked_and_no_specialization_it_goes_by_the_ticked_roles():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = None
     game.roles = lua.table_from([False, True, False, True])
     role_check(game)
     assert game.count("SetLFGRoles") == 0
-    assert printed(game)[-1].endswith("accepted the role check as Tank, Damage.")
+    assert "accepted the role check as Tank, Damage." in printed(game)[-1]
 
 
 @check
 def leaves_the_window_open_when_the_game_refuses_the_role_check():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.role_check_result = False
     role_check(game)
     game.next_frame()
@@ -529,7 +558,7 @@ def leaves_the_window_open_when_the_game_refuses_the_role_check():
 
 @check
 def leaves_the_role_check_alone_when_no_role_is_ticked():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = None
     game.roles = lua.table_from([False, False, False, False])
     role_check(game)
@@ -541,15 +570,15 @@ def leaves_the_role_check_alone_when_no_role_is_ticked():
 
 @check
 def a_battleground_role_check_uses_the_battleground_roles():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.battleground_role_check = True
     game.spec_role = "TANK"
     role_check(game)
     assert args(game, "SetPVPRoles") == (True, False, False)
     assert game.count("SetLFGRoles") == 0
-    assert printed(game)[-1].endswith("accepted the role check as Tank.")
+    assert "accepted the role check as Tank." in printed(game)[-1]
 
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.battleground_role_check = True
     game.spec_role = None
     role_check(game)  # a dungeon role is ticked, but no battleground role
@@ -557,7 +586,7 @@ def a_battleground_role_check_uses_the_battleground_roles():
     game.pvp_roles = lua.table_from([False, True, False])
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 1
-    assert printed(game)[-1].endswith("accepted the role check as Healer.")
+    assert "accepted the role check as Healer." in printed(game)[-1]
 
 
 def sign_up_window(lua):
@@ -565,8 +594,8 @@ def sign_up_window(lua):
 
 
 @check
-def leaves_the_sign_up_window_alone_until_switched_on():
-    lua, game = load("retail")
+def leaves_the_sign_up_window_alone_when_switched_off():
+    lua, game = load("retail", {"noAutoQueue": True})
     game.sign_up()
     assert game.count("ApplyToGroup") == 0 and game.count("SetLFGRoles") == 0
     assert sign_up_window(lua).is_open is True
@@ -575,26 +604,26 @@ def leaves_the_sign_up_window_alone_until_switched_on():
 
 @check
 def signs_up_as_the_current_specializations_role():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = "HEALER"  # the damage tick from last time is still there
     game.sign_up()
     assert args(game, "ApplyToGroup") == (False, True, False)
     assert sign_up_window(lua).is_open is False
-    assert printed(game)[-1].endswith("signed up as Healer.")
+    assert "signed up as Healer." in printed(game)[-1]
 
 
 @check
 def signs_up_as_the_role_picked_in_the_options():
-    lua, game = load("retail", {"roleWindows": True, "role": "TANK"})
+    lua, game = load("retail", {"role": "TANK"})
     game.spec_role = "HEALER"
     game.sign_up()
     assert args(game, "ApplyToGroup") == (True, False, False)
-    assert printed(game)[-1].endswith("signed up as Tank.")
+    assert "signed up as Tank." in printed(game)[-1]
 
 
 @check
 def leaves_the_sign_up_window_open_for_a_role_the_character_cannot_fill():
-    lua, game = load("retail", {"roleWindows": True, "role": "TANK"})
+    lua, game = load("retail", {"role": "TANK"})
     game.can_tank = False
     game.sign_up()
     assert game.count("ApplyToGroup") == 0, "signing up would send whatever else was ticked"
@@ -604,7 +633,7 @@ def leaves_the_sign_up_window_open_for_a_role_the_character_cannot_fill():
 
 @check
 def holding_shift_leaves_the_sign_up_window_alone():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = "HEALER"
     game.shift = True
     game.sign_up()
@@ -614,14 +643,14 @@ def holding_shift_leaves_the_sign_up_window_alone():
 
 @check
 def with_no_role_to_go_by_it_signs_up_with_the_ticked_roles_or_not_at_all():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = None
     game.roles = lua.table_from([False, True, False, True])
     game.sign_up()
     assert args(game, "ApplyToGroup") == (True, False, True)
-    assert printed(game)[-1].endswith("signed up as Tank, Damage.")
+    assert "signed up as Tank, Damage." in printed(game)[-1]
 
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     game.spec_role = None
     game.roles = lua.table_from([False, False, False, False])
     game.sign_up()
@@ -631,7 +660,7 @@ def with_no_role_to_go_by_it_signs_up_with_the_ticked_roles_or_not_at_all():
 
 @check
 def signing_up_is_quiet_when_chat_messages_are_off():
-    lua, game = load("retail", {"roleWindows": True, "quiet": True})
+    lua, game = load("retail", {"quiet": True})
     game.sign_up()
     assert game.count("ApplyToGroup") == 1
     assert printed(game) == []
@@ -639,49 +668,52 @@ def signing_up_is_quiet_when_chat_messages_are_off():
 
 @check
 def a_game_version_with_role_checks_but_no_sign_up_window_still_gets_the_option():
-    lua, game = load("mists", {"roleWindows": True})
-    assert game.checkbox("Answer the role window") is not None
+    lua, game = load("mists", {})
+    assert game.checkbox("Automatically queue for me") is not None
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 1
 
 
 @check
 def role_checks_and_invites_are_switched_separately():
-    lua, game = load("retail", {"roleWindows": True, "disabled": True})
+    lua, game = load("retail", {"disabled": True})
     invite(game)
     role_check(game)
     assert game.count("AcceptGroup") == 0
     assert game.count("CompleteLFGRoleCheck") == 1
-    lua, game = load("retail", {"roleWindows": True, "quiet": True})
+    lua, game = load("retail", {"quiet": True})
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 1
     assert printed(game) == []
 
 
 @check
-def slash_role_toggles_role_checks():
+def slash_queue_switches_queueing_off_and_on():
     lua, game = load("retail")
     slash = lua.globals().SlashCmdList["AUTOACCEPTINVITE"]
-    slash("role")
-    assert lua.globals().AutoAcceptInviteDB.roleWindows is True
-    assert "role windows" in printed(game)[-1] and "ON" in printed(game)[-1]
-    assert "specialization" in printed(game)[-1], "it says which role it will accept with"
+    slash("queue")
+    assert lua.globals().AutoAcceptInviteDB.noAutoQueue is True
+    assert "queueing for you" in printed(game)[-1] and "OFF" in printed(game)[-1]
+    role_check(game)
+    game.sign_up()
+    assert game.count("CompleteLFGRoleCheck") == 0 and game.count("ApplyToGroup") == 0
+    slash("queue")
+    assert lua.globals().AutoAcceptInviteDB.noAutoQueue is False
+    assert "ON" in printed(game)[-1]
+    assert "specialization" in printed(game)[-1], "it says which role it will queue as"
     role_check(game)
     assert game.count("CompleteLFGRoleCheck") == 1
-    slash("role")
-    assert lua.globals().AutoAcceptInviteDB.roleWindows is False
-    assert "OFF" in printed(game)[-1]
-    assert lua.globals().AutoAcceptInviteDB.disabled is None, "/aai role must not touch the invite switch"
+    assert lua.globals().AutoAcceptInviteDB.disabled is None, "/aai queue must not touch the invite switch"
 
 
 @check
 def game_versions_without_role_checks_show_no_role_option():
-    lua, game = load("era", {"roleWindows": True})
-    assert game.checkbox("Answer the role window") is None
+    lua, game = load("era", {})
+    assert game.checkbox("Automatically queue for me") is None
     assert game.checkbox("Auto-accept invites") is not None
     assert game.checkbox("Print a chat message") is not None
-    lua.globals().SlashCmdList["AUTOACCEPTINVITE"]("role")
-    assert "no role windows" in printed(game)[-1]
+    lua.globals().SlashCmdList["AUTOACCEPTINVITE"]("queue")
+    assert "no group finder" in printed(game)[-1]
     role_check(game)  # the event exists there, but the addon does not listen for it
     assert game.count("CompleteLFGRoleCheck") == 0
     invite(game)
@@ -694,21 +726,24 @@ def options_panel_shows_and_changes_the_settings():
     panel = [f for f in (game.frames[i] for i in range(1, len(game.frames) + 1)) if f.name == "AutoAcceptInvite"][0]
     panel.Show(panel)
     invites = game.checkbox("Auto-accept invites")
-    roles = game.checkbox("Answer the role window")
+    roles = game.checkbox("Automatically queue for me")
     chat = game.checkbox("Print a chat message")
-    assert (invites.checked, roles.checked, chat.checked) == (True, False, False)
+    assert (invites.checked, roles.checked, chat.checked) == (True, True, False)
     game.click(roles)
     game.click(chat)
     game.click(invites)
     db = lua.globals().AutoAcceptInviteDB
-    assert (db.disabled, db.roleWindows, db.quiet) == (True, True, False)
+    assert (db.disabled, db.noAutoQueue, db.quiet) == (True, True, False)
     role_check(game)
-    assert printed(game)[-1].endswith("accepted the role check as Damage.")
+    assert game.count("CompleteLFGRoleCheck") == 0, "unticked means the role check is left alone"
+    game.click(roles)
+    role_check(game)
+    assert "accepted the role check as Damage." in printed(game)[-1]
 
 
 @check
 def options_panel_lets_the_player_pick_one_role_to_queue_as():
-    lua, game = load("retail", {"roleWindows": True})
+    lua, game = load("retail", {})
     panel = [f for f in (game.frames[i] for i in range(1, len(game.frames) + 1)) if f.name == "AutoAcceptInvite"][0]
     panel.Show(panel)
     spec, tank, healer, damage = (game.checkbox(label) for label in
@@ -724,7 +759,7 @@ def options_panel_lets_the_player_pick_one_role_to_queue_as():
     game.click(healer)  # clicking the ticked one again leaves it ticked
     assert db.role == "HEALER" and ticked() == (False, False, True, False)
     role_check(game)
-    assert printed(game)[-1].endswith("accepted the role check as Healer.")
+    assert "accepted the role check as Healer." in printed(game)[-1]
     game.click(spec)
     assert db.role is None and ticked() == (True, False, False, False)
 

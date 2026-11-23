@@ -1,11 +1,12 @@
 -- AutoAcceptInvite: accepts incoming party/raid invites, from everyone or only
--- from friends and guild members, and, when asked to, answers the window that
--- asks for your role when your group's leader queues or you sign up for a group.
+-- from friends and guild members, and queues for you: it answers the window
+-- that asks for your role when your group's leader queues or you sign up for a
+-- group.
 --
 -- Options panel: Esc > Options > AddOns > AutoAcceptInvite
 -- /aai            toggle invites on/off
 -- /aai on|off     enable / disable invites
--- /aai role       toggle answering role windows on/off
+-- /aai queue      toggle queueing for you on/off
 -- /aai options    open the options panel, where whose invites and which role
 --                 are picked
 
@@ -15,17 +16,17 @@ local PREFIX = "|cff33ff99AutoAcceptInvite|r: "
 ------------------------------------------------------------------------
 -- Settings
 ------------------------------------------------------------------------
--- Saved account-wide. Invites and chat lines are "on" while unset, so a fresh
--- install needs no setup. Role checks are off until switched on, because
--- accepting one commits you to a role.
+-- Saved account-wide. Everything is "on" while unset, so a fresh install needs
+-- no setup.
 --   AutoAcceptInviteDB.disabled     true = do not auto-accept invites
 --   AutoAcceptInviteDB.from         whose invites to accept: "FRIENDS_GUILD",
 --                                   "FRIENDS" or "GUILD"; unset = everyone's
---   AutoAcceptInviteDB.quiet        true = no chat line when accepting
---   AutoAcceptInviteDB.roleWindows  true = also answer the game's role windows
---   AutoAcceptInviteDB.role         the role to accept them as: "TANK", "HEALER"
---                                   or "DAMAGER"; unset = the current
+--   AutoAcceptInviteDB.noAutoQueue  true = do not queue for me: leave the
+--                                   game's role windows for the player
+--   AutoAcceptInviteDB.role         the role to queue as: "TANK", "HEALER" or
+--                                   "DAMAGER"; unset = the current
 --                                   specialization's role
+--   AutoAcceptInviteDB.quiet        true = no chat line when it does something
 
 local function GetDB()
 	AutoAcceptInviteDB = AutoAcceptInviteDB or {}
@@ -40,6 +41,19 @@ local function IsChatty()
 	return not GetDB().quiet
 end
 
+-- Says in chat what the addon just did. The first line of each kind after
+-- logging in also says how to change it, for a player who did not expect it.
+local hinted = {}
+
+local function Announce(kind, message, hint)
+	if not IsChatty() then return end
+	if not hinted[kind] then
+		hinted[kind] = true
+		message = message .. " " .. hint
+	end
+	print(PREFIX .. message)
+end
+
 -- Whose invites are accepted: "FRIENDS_GUILD", "FRIENDS", "GUILD", or nil for
 -- everyone's.
 local function AcceptsFrom()
@@ -49,8 +63,8 @@ local function AcceptsFrom()
 	end
 end
 
-local function AnswersRoleWindows()
-	return GetDB().roleWindows == true
+local function QueuesForMe()
+	return not GetDB().noAutoQueue
 end
 
 -- The role picked in the options, or nil for "my current specialization's role".
@@ -218,7 +232,7 @@ end
 -- window still counts while it opens, so this runs as the window shows.
 -- Holding Shift leaves the window alone, to change role or write a note.
 local function AnswerSignUpWindow(window)
-	if not AnswersRoleWindows() or IsShiftKeyDown() then return end
+	if not QueuesForMe() or IsShiftKeyDown() then return end
 
 	local role = RoleToAnswerWith()
 	if role then
@@ -242,9 +256,8 @@ local function AnswerSignUpWindow(window)
 	if not window.SignUpButton:IsEnabled() then return end
 
 	window.SignUpButton:Click()
-	if IsChatty() then
-		print(PREFIX .. "signed up as " .. RoleNames(tank, healer, damage) .. ".")
-	end
+	Announce("sign-up", "signed up as " .. RoleNames(tank, healer, damage) .. ".",
+		"Hold Shift as you sign up to choose the role or write a note yourself. /aai options to change this.")
 end
 
 ------------------------------------------------------------------------
@@ -338,15 +351,15 @@ local function AddCheckboxes()
 	end)
 
 	if hasRoleWindows then
-		last = AddCheckbox(last, "Answer the role window for me", AnswersRoleWindows, function(checked)
-			GetDB().roleWindows = checked
+		last = AddCheckbox(last, "Automatically queue for me", QueuesForMe, function(checked)
+			GetDB().noAutoQueue = not checked
 		end, -INDENT)
 
 		local note = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
 		note:SetPoint("TOPLEFT", last, "BOTTOMLEFT", INDENT, 0)
 		note:SetJustifyH("LEFT")
-		note:SetText("When your group's leader queues, and when you sign up for a group yourself.\n"
-			.. "Hold Shift while signing up to answer it yourself.")
+		note:SetText("Answers the role window when your group's leader queues, and when you sign up for a group yourself.\n"
+			.. "Hold Shift as you sign up to choose the role or write a note yourself.")
 
 		last = AddChoices(note, "Queue as:", {
 			{ nil, "My current specialization's role" },
@@ -432,15 +445,13 @@ frame:SetScript("OnEvent", function(self, event, ...)
 		-- decline. Wait until we have joined.
 		self:RegisterEvent("GROUP_ROSTER_UPDATE")
 
-		if IsChatty() then
-			-- On retail the inviter's name can be a "secret" value that addons
-			-- may not read; only print it when it is a normal string.
-			if type(inviter) == "string" and not (issecretvalue and issecretvalue(inviter)) then
-				print(PREFIX .. "accepted invite from " .. inviter .. ".")
-			else
-				print(PREFIX .. "accepted invite.")
-			end
+		-- On retail the inviter's name can be a "secret" value that addons may
+		-- not read; only print it when it is a normal string.
+		local who = ""
+		if type(inviter) == "string" and not (issecretvalue and issecretvalue(inviter)) then
+			who = " from " .. inviter
 		end
+		Announce("invite", "accepted invite" .. who .. ".", "/aai options to change this.")
 	elseif event == "GROUP_ROSTER_UPDATE" then
 		-- The roster also changes for other reasons, such as leaving the group
 		-- we were in just before. Only being in a group means the invite is done.
@@ -453,14 +464,12 @@ frame:SetScript("OnEvent", function(self, event, ...)
 			StaticPopupSpecial_Hide(LFGInvitePopup)
 		end
 	elseif event == "LFG_ROLE_CHECK_SHOW" then
-		local roles = AnswersRoleWindows() and AcceptRoleCheck()
+		local roles = QueuesForMe() and AcceptRoleCheck()
 		if roles then
 			-- On the next frame, because the game may not have opened the
 			-- window yet when this runs.
 			C_Timer.After(0, HideRoleCheckWindow)
-			if IsChatty() then
-				print(PREFIX .. "accepted the role check as " .. roles .. ".")
-			end
+			Announce("role check", "accepted the role check as " .. roles .. ".", "/aai options to change this.")
 		end
 	end
 end)
@@ -482,20 +491,20 @@ SlashCmdList["AUTOACCEPTINVITE"] = function(msg)
 
 	-- Commands only switch things on and off. Whose invites and which role are
 	-- picked in the options panel.
-	if msg == "role" or msg == "roles" then
+	if msg == "queue" then
 		if not hasRoleWindows then
-			print(PREFIX .. "this game version has no role windows.")
+			print(PREFIX .. "this game version has no group finder to queue in.")
 			return
 		end
 
-		db.roleWindows = not AnswersRoleWindows()
+		db.noAutoQueue = QueuesForMe()
 		RefreshPanel()
 
 		local as = ChosenRole() and RoleName(ChosenRole()) or "your current specialization's role"
-		if AnswersRoleWindows() then
-			print(PREFIX .. "role windows |cff00ff00ON|r - answering them as " .. as .. ".")
+		if QueuesForMe() then
+			print(PREFIX .. "queueing for you |cff00ff00ON|r - as " .. as .. ".")
 		else
-			print(PREFIX .. "role windows |cffff0000OFF|r - they are left for you to answer. When on: as " .. as .. ".")
+			print(PREFIX .. "queueing for you |cffff0000OFF|r - role windows are left for you to answer. When on: as " .. as .. ".")
 		end
 		return
 	end
@@ -507,7 +516,7 @@ SlashCmdList["AUTOACCEPTINVITE"] = function(msg)
 	elseif msg == "off" then
 		db.disabled = true
 	else
-		print(PREFIX .. "usage: /aai (toggle), /aai on, /aai off, /aai role, /aai options")
+		print(PREFIX .. "usage: /aai (toggle), /aai on, /aai off, /aai queue, /aai options")
 		return
 	end
 
