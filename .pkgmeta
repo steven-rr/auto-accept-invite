@@ -6,4 +6,7 @@ ignore:
   - .gitignore
   - .pkgmeta
   - .github
+  - docs
+  - tests
+  - deploy.py
   - .DS_Store
