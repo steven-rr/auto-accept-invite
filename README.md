@@ -31,7 +31,9 @@ An invite from anyone else gets the normal popup, for you to answer.
 The game asks for your role in two windows. With **Automatically queue for me** on, as it is unless you switch it off, the addon answers both, and the chat line names the role it answered with:
 
 - **The role check**, when your group's leader queues for a dungeon or battleground, or signs the group up for a premade group.
-- **The sign-up window**, when you sign up for a premade group yourself. You can also double-click a group in the list to sign up for it, instead of selecting it and pressing Sign Up. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
+- **The sign-up window**, when you sign up for a premade group yourself. Hold Shift as you sign up to see the window and answer it yourself, for example to write a note.
+
+Signing up is also quicker: double-click a group in the list to sign up for it, instead of selecting it and pressing Sign Up. This has its own checkbox, at the bottom of the options, for those who would rather not.
 
 You choose which role it queues you as, under **Queue as** in the options. This one choice is kept per character, so your tank can always queue as tank while your other characters follow their specialization:
 
@@ -52,6 +54,7 @@ Open **Esc > Options > AddOns > AutoAcceptInvite**, or type `/aai options`.
 - **Automatically queue for me**: on by default. Only shown in game versions that have a dungeon finder.
 - **Queue as**: my current specialization's role (the default), Tank, Healer or Damage.
 - **Print a chat message when something is accepted**: on by default.
+- **Double-click a group in the list to sign up for it**: on by default. Only shown in game versions that have the list of premade groups.
 
 Changes apply as soon as you click. The settings are shared by every character on the account, except **Queue as**, which each character keeps for itself.
 

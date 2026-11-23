@@ -843,14 +843,41 @@ def double_clicking_does_no_more_than_the_sign_up_button_would():
     double_click(game)
     assert game.count("LFGListSearchPanel_SignUp") == 0
 
-    lua, game = load("retail", {"noAutoQueue": True})
-    double_click(game)
-    assert game.count("LFGListSearchPanel_SignUp") == 0, "switched off, a double-click is just two clicks"
-
     lua, game = load("retail")
     game.secret = 7  # the game is hiding this group's details from addons
     double_click(game)
     assert game.count("LFGListSearchPanel_SignUp") == 0
+
+
+@check
+def double_click_and_queueing_for_the_player_are_switched_separately():
+    lua, game = load("retail", {"noDoubleClick": True})
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 0, "switched off, a double-click is just two clicks"
+    game.sign_up()  # pressing Sign Up the usual way is still answered
+    assert game.count("ApplyToGroup") == 1
+
+    lua, game = load("retail", {"noAutoQueue": True})
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 1, "the double-click still opens the sign-up window"
+    assert game.count("ApplyToGroup") == 0 and sign_up_window(lua).is_open is True, "which is left for the player"
+
+
+@check
+def options_panel_has_the_double_click_option_where_there_is_a_group_list():
+    lua, game = load("retail")
+    panel = [f for f in (game.frames[i] for i in range(1, len(game.frames) + 1)) if f.name == "AutoAcceptInvite"][0]
+    panel.Show(panel)
+    box = game.checkbox("Double-click a group")
+    assert box.checked is True, "on until switched off"
+    game.click(box)
+    assert lua.globals().AutoAcceptInviteDB.noDoubleClick is True
+    double_click(game)
+    assert game.count("LFGListSearchPanel_SignUp") == 0
+
+    for flavor in ("mists", "era"):  # the stand-in gives these no list of premade groups
+        lua, game = load(flavor)
+        assert game.checkbox("Double-click a group") is None, flavor
 
 
 @check
@@ -886,6 +913,7 @@ def the_options_describe_only_the_role_windows_the_game_version_has():
     lua, game = load("retail")
     note = [t for t in panel_texts(game) if t.startswith("Answers the role window")][0]
     assert "group's leader queues" in note and "sign up for a group yourself" in note and "Hold Shift" in note
+    assert "Double-click" not in note, "that has its own checkbox"
 
     lua, game = load("mists")  # a role check, but no sign-up window
     note = [t for t in panel_texts(game) if t.startswith("Answers the role window")][0]

@@ -26,6 +26,8 @@ local PREFIX = "|cff33ff99AutoAcceptInvite|r: "
 --                                   unset = leave those for the player
 --   AutoAcceptInviteDB.noAutoQueue  true = do not queue for me: leave the
 --                                   game's role windows for the player
+--   AutoAcceptInviteDB.noDoubleClick  true = double-clicking a group in the
+--                                   premade list does not sign up for it
 --   AutoAcceptInviteDB.quiet        true = no chat line when it does something
 --
 -- Kept per character, because a tank and a mage do not queue as the same role:
@@ -79,6 +81,10 @@ end
 
 local function QueuesForMe()
 	return not GetDB().noAutoQueue
+end
+
+local function DoubleClickSignsUp()
+	return not GetDB().noDoubleClick
 end
 
 -- The role picked in the options for this character, or nil for "my current
@@ -290,13 +296,15 @@ local function AnswerSignUpWindow(window)
 end
 
 -- Double-clicking a group in the premade list signs up for it, the same as
--- selecting it and pressing Sign Up. The game runs this after each click on a
--- group; two on the same group in quick succession are a double-click.
+-- selecting it and pressing Sign Up: the sign-up window opens, and is answered
+-- above if the player has the addon queue for them. The game runs this after
+-- each click on a group; two on the same group in quick succession are a
+-- double-click.
 local DOUBLE_CLICK_SECONDS = 0.4
 local lastGroup, lastClickAt
 
 local function OnGroupClicked(entry, button)
-	if not QueuesForMe() or button == "RightButton" then return end
+	if not DoubleClickSignsUp() or button == "RightButton" then return end
 
 	-- The game can hide a group's details from addons; then there is nothing
 	-- to compare, and the click is left to the game.
@@ -428,8 +436,7 @@ local function AddCheckboxes()
 
 		-- Describe only the role windows this game version has: one with a role
 		-- check does not always have the sign-up window too.
-		local signUpTips = "\nDouble-click a group in the list to sign up for it."
-			.. "\nHold Shift as you sign up to choose the role or write a note yourself."
+		local signUpTips = "\nHold Shift as you sign up to choose the role or write a note yourself."
 		local explanation
 		if LFDRoleCheckPopup and LFGListApplicationDialog then
 			explanation = "Answers the role window when your group's leader queues, and when you sign up for a group yourself." .. signUpTips
@@ -454,9 +461,16 @@ local function AddCheckboxes()
 		end, 0)
 	end
 
-	AddCheckbox(last, "Print a chat message when something is accepted", IsChatty, function(checked)
+	last = AddCheckbox(last, "Print a chat message when something is accepted", IsChatty, function(checked)
 		GetDB().quiet = not checked
 	end, -INDENT)
+
+	-- Only where the game has the list of premade groups to double-click in.
+	if LFGListApplicationDialog and LFGListSearchEntry_OnClick and LFGListSearchPanel_SignUp then
+		AddCheckbox(last, "Double-click a group in the list to sign up for it", DoubleClickSignsUp, function(checked)
+			GetDB().noDoubleClick = not checked
+		end)
+	end
 end
 
 panel:SetScript("OnShow", RefreshPanel)
