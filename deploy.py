@@ -15,7 +15,7 @@ import sys
 ADDON_NAME = "AutoAcceptInvite"
 ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 WOW = r"C:\Program Files (x86)\World of Warcraft"
-FILES = ["AutoAcceptInvite.toc", "AutoAcceptInvite.lua"]
+FILES = ["AutoAcceptInvite.toc", "AutoAcceptInvite.lua", "icon.tga"]
 
 # What to type, and the game folder it means.
 GAMES = {
