@@ -2,7 +2,7 @@
 ## Title: AutoAcceptInvite
 ## Notes: Automatically accepts party invites, from everyone or only friends and guild, and queues for you when a role is asked for. /aai to toggle, /aai options for settings.
 ## Author: stevenrivadeneira
-## Version: 1.1.0
+## Version: 1.1.1
 ## SavedVariables: AutoAcceptInviteDB
 ## SavedVariablesPerCharacter: AutoAcceptInviteCharDB
 ## IconTexture: Interface\AddOns\AutoAcceptInvite\icon.tga
