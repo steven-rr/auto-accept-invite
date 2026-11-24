@@ -68,9 +68,13 @@ Changes apply as soon as you click. The settings are shared by every character o
 
 ## Installation
 
+Install it with the CurseForge app, or from [its CurseForge page](https://www.curseforge.com/wow/addons/autoacceptinvite).
+
+To install it by hand:
+
 1. Download the latest release from the [Releases page](https://github.com/steven-rr/auto-accept-invite/releases)
-2. Extract the `AutoAcceptInvite` folder into your `World of Warcraft/_retail_/Interface/AddOns/` directory
-3. Restart WoW or type `/reload` if you're already logged in
+2. Extract the `AutoAcceptInvite` folder into the `Interface/AddOns/` directory of the game version you play, for example `World of Warcraft/_retail_/Interface/AddOns/`
+3. Restart WoW
 
 ## License
 
