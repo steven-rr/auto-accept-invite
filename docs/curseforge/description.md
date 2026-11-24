@@ -27,5 +27,3 @@ AutoAcceptInvite runs quietly in the background. It accepts group invites the mo
 *   `/aai` — turn auto-accepting invites on or off
 *   `/aai queue` — turn queueing for you on or off
 *   `/aai options` — open the options
-
-![AutoAcceptInvite](https://raw.githubusercontent.com/steven-rr/auto-accept-invite/master/docs/curseforge/banner.png)
